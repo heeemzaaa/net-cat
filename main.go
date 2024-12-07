@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
 var (
-	clientM = make(map[string]net.Conn)
-	mu      sync.Mutex
+	clientM        = make(map[string]net.Conn)
+	storedMessages = []string{}
+	mu             sync.Mutex
 )
 
 func StartServer() net.Listener {
@@ -30,6 +33,7 @@ func StartServer() net.Listener {
 		fmt.Println("Error listening:", err)
 		return nil
 	}
+	fmt.Printf("Server started on port %s\n", port)
 	return listener
 }
 
@@ -38,18 +42,20 @@ func AcceptConnections(listener net.Listener) {
 		conn, err := listener.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connections:", err)
-			return
+			continue
 		}
 		go HandleClients(conn)
 	}
 }
 
-// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 func HandleClients(conn net.Conn) {
 	defer conn.Close()
 
 	Welcoming(conn)
 	name := ClientName(conn)
+	SendHistoryChat(conn)
+	message := fmt.Sprintf("\n%s has joined our chat...\n", name)
+	BroadcastMessage(message, conn)
 	Handlemessages(name, conn)
 }
 
@@ -75,7 +81,7 @@ _)      \.___.,|     .'
 
 	_, err := conn.Write([]byte(welcome))
 	if err != nil {
-		fmt.Println("Error sending the welcoming message :", err)
+		fmt.Println("Error sending the welcoming message:", err)
 		return
 	}
 }
@@ -105,21 +111,28 @@ func ClientName(conn net.Conn) string {
 
 		clientM[name] = conn
 		mu.Unlock()
-		message := fmt.Sprintf("\n%s has joined our chat...\n", name)
-		BroadcastMessage(message, conn)
+
 		fmt.Printf("Client %s connected\n", name)
 		return name
 	}
 }
 
-func BroadcastMessage(message string, exluded net.Conn) {
-	for client, conn := range clientM {
-		if conn != exluded {
+func BroadcastMessage(message string, excluded net.Conn) {
+	mu.Lock()
+	storedMessages = append(storedMessages, strings.TrimSpace(message))
+	defer mu.Unlock()
+
+	for clientName, conn := range clientM {
+		if conn == excluded {
+			TypingPlace(clientName, conn)
+			continue
+		} else {
 			_, err := conn.Write([]byte(message))
 			if err != nil {
-				fmt.Printf("Error broadcasting the message to the client %s : %v\n", client, err)
-				return
+				fmt.Printf("Error broadcasting to %s: %v\n", clientName, err)
+				continue
 			}
+			TypingPlace(clientName, conn)
 		}
 	}
 }
@@ -137,11 +150,9 @@ func RemoveClient(name string) {
 	delete(clientM, name)
 	mu.Unlock()
 
-	message := fmt.Sprintf("%s has left our chat...\n", name)
+	message := fmt.Sprintf("\n%s has left our chat...\n", name)
 	BroadcastMessage(message, nil)
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func Handlemessages(name string, conn net.Conn) {
 	reader := bufio.NewReader(conn)
@@ -154,20 +165,52 @@ func Handlemessages(name string, conn net.Conn) {
 		}
 
 		message = strings.TrimSpace(message)
-		if message == "" {
-			continue
+		if message != "" {
+			timeNow := time.Now().Format("2006-01-02 15:04:05")
+			formattedMessage := fmt.Sprintf("\n[%s][%s]: %s\n", timeNow, name, message)
+			BroadcastMessage(formattedMessage, conn)
+		} else {
+			TypingPlace(name, conn)
 		}
-		timeNow := time.Now().Format(time.DateTime)
-		formattedMessage := fmt.Sprintf("[%s][%s]:", timeNow, name)
-		BroadcastMessage(formattedMessage, conn)
+
 	}
 }
 
-func IsEmpty(message string) bool {
-	if message == "" {
-		return true
+func TypingPlace(name string, conn net.Conn) {
+	timeNow := time.Now().Format("2006-01-02 15:04:05")
+	prompt := fmt.Sprintf("[%s][%s]:", timeNow, name)
+	_, err := conn.Write([]byte(prompt))
+	if err != nil {
+		fmt.Printf("Error sending typing prompt to %s: %v\n", name, err)
 	}
-	return false
+}
+
+func StoreMessages(message string) {
+	mu.Lock()
+	storedMessages = append(storedMessages, message)
+	mu.Unlock()
+}
+
+func SendHistoryChat(conn net.Conn) {
+	mu.Lock()
+	defer mu.Unlock()
+	for i := 0; i < len(storedMessages); i++ {
+		if storedMessages[i][0] == '[' && len(storedMessages[i]) != 0 {
+			slice := strings.Split(storedMessages[i], ":")
+			if slice[3] != "" {
+				_, err := conn.Write([]byte(storedMessages[i] + "\n"))
+				if err != nil {
+					fmt.Printf("Error sending chat history: %v\n", err)
+					return
+				}
+			}
+
+		}
+	}
+}
+
+func IncrementConnectionCount() {
+	mu.Lock() 	
 }
 
 func main() {
@@ -176,6 +219,21 @@ func main() {
 		return
 	}
 	defer listener.Close()
+
+	// Graceful shutdown handling
+	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		<-c
+		fmt.Println("\nShutting down the server...")
+		mu.Lock()
+		for _, conn := range clientM {
+			conn.Close()
+		}
+		mu.Unlock()
+		listener.Close()
+		os.Exit(0)
+	}()
 
 	AcceptConnections(listener)
 }
