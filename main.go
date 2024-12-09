@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -22,7 +20,7 @@ var (
 func StartServer() net.Listener {
 	port := ":8989"
 	if len(os.Args) > 2 {
-		fmt.Println("[USAGE]: ./TCPChat $port\n")
+		fmt.Println("[USAGE]: ./TCPChat $port")
 		return nil
 	}
 	if len(os.Args) == 2 {
@@ -286,21 +284,6 @@ func main() {
 		return
 	}
 	defer listener.Close()
-
-	// Graceful shutdown handling
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-		<-c
-		fmt.Println("\nShutting down the server...")
-		mu.Lock()
-		for _, conn := range clientM {
-			conn.Close()
-		}
-		mu.Unlock()
-		listener.Close()
-		os.Exit(0)
-	}()
 
 	AcceptConnections(listener)
 }
