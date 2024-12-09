@@ -16,6 +16,7 @@ var (
 	clientM        = make(map[string]net.Conn)
 	storedMessages = []string{}
 	mu             sync.Mutex
+	counter        int
 )
 
 func StartServer() net.Listener {
@@ -53,6 +54,11 @@ func HandleClients(conn net.Conn) {
 
 	Welcoming(conn)
 	name := ClientName(conn)
+	IncrementConnectionCount()
+	if counter >= 3 {
+		RejectConnection(conn)
+		return
+	}
 	SendHistoryChat(conn)
 	message := fmt.Sprintf("\n%s has joined our chat...\n", name)
 	BroadcastMessage(message, conn)
@@ -87,7 +93,17 @@ _)      \.___.,|     .'
 }
 
 func ClientName(conn net.Conn) string {
+	logCount := 0
 	for {
+		if logCount > 2 {
+			_, err := conn.Write([]byte("\nYou've reached your trying limit"))
+			if err != nil {
+				fmt.Println("Error:", err)
+				return ""
+			}
+			logCount = 0
+			conn.Close()
+		}
 		reader := bufio.NewReader(conn)
 		name, err := reader.ReadString('\n')
 		if err != nil {
@@ -96,19 +112,29 @@ func ClientName(conn net.Conn) string {
 		}
 
 		name = strings.TrimSpace(name)
+		if !Printable(name) {
+			name = ""
+		}
 
 		if name == "" || len(name) > 25 {
-			conn.Write([]byte("Please enter a valid name!\n"))
+			conn.Write([]byte("Please enter a valid name!\n[ENTER YOUR NAME]: "))
+			logCount++
+			continue
+		}
+
+		if SpaceName(name) {
+			conn.Write([]byte("The username must be without space !\n[ENTER YOUR NAME]: "))
+			logCount++
 			continue
 		}
 
 		mu.Lock()
 		if _, exists := clientM[name]; exists {
 			mu.Unlock()
-			conn.Write([]byte("Name already taken. Choose another one:\n"))
+			conn.Write([]byte("Name already taken. Choose another one:\n[ENTER YOUR NAME]: "))
+			logCount++
 			continue
 		}
-
 		clientM[name] = conn
 		mu.Unlock()
 
@@ -161,11 +187,15 @@ func Handlemessages(name string, conn net.Conn) {
 		if err != nil {
 			fmt.Printf("Client %s disconnected: %v\n", name, err)
 			RemoveClient(name)
+			DecrementConnectionCount()
 			return
 		}
 
 		message = strings.TrimSpace(message)
-		if message != "" {
+		if !Printable(message) {
+			message = ""
+		}
+		if message != "" && len(message) < 300 {
 			timeNow := time.Now().Format("2006-01-02 15:04:05")
 			formattedMessage := fmt.Sprintf("\n[%s][%s]: %s\n", timeNow, name, message)
 			BroadcastMessage(formattedMessage, conn)
@@ -210,7 +240,44 @@ func SendHistoryChat(conn net.Conn) {
 }
 
 func IncrementConnectionCount() {
-	mu.Lock() 	
+	mu.Lock()
+	defer mu.Unlock()
+	counter++
+}
+
+func DecrementConnectionCount() {
+	mu.Lock()
+	defer mu.Unlock()
+	counter--
+}
+
+func RejectConnection(conn net.Conn) {
+	_, err := conn.Write([]byte("The room has reached its limit , try again later !\n"))
+	if err != nil {
+		fmt.Println("Error :", err)
+		return
+	}
+	conn.Close()
+}
+
+func Printable(message string) bool {
+	slice := []rune(message)
+	for i := 0; i < len(slice); i++ {
+		if !(slice[i] >= 32 && slice[i] <= 126) {
+			return false
+		}
+	}
+	return true
+}
+
+func SpaceName(name string) bool {
+	slice := []rune(name)
+	for i := 0; i < len(slice); i++ {
+		if slice[i] == ' ' {
+			return true
+		}
+	}
+	return false
 }
 
 func main() {
