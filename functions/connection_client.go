@@ -103,7 +103,7 @@ func ClientName(conn net.Conn) string {
 
 func BroadcastMessage(message string, excluded net.Conn) {
 	mu.Lock()
-	storedMessages = append(storedMessages, strings.TrimSpace(message))
+	StoreMessages(message)
 	defer mu.Unlock()
 
 	for clientName, conn := range clientM {

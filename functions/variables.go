@@ -7,7 +7,6 @@ import (
 
 var (
 	clientM        = make(map[string]net.Conn)
-	storedMessages = []string{}
 	mu             sync.Mutex
 	counter        int
 )

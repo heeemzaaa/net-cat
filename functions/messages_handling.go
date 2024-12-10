@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"time"
 )
@@ -44,25 +45,46 @@ func TypingPlace(name string, conn net.Conn) {
 }
 
 func StoreMessages(message string) {
-	mu.Lock()
-	storedMessages = append(storedMessages, message)
-	mu.Unlock()
+	filePath := "file/messages.txt"
+
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o666)
+	if err != nil {
+		fmt.Println("Error opening the file :", err)
+		return
+	}
+	defer file.Close()
+	message = strings.TrimSpace(message)
+	_, err = file.WriteString(message + "\n")
+	if err != nil {
+		fmt.Println("Error writing in the file :", err)
+		return
+	}
 }
 
 func SendHistoryChat(conn net.Conn) {
 	mu.Lock()
 	defer mu.Unlock()
-	for i := 0; i < len(storedMessages); i++ {
-		if storedMessages[i][0] == '[' && len(storedMessages[i]) != 0 {
-			slice := strings.Split(storedMessages[i], ":")
-			if slice[3] != "" {
-				_, err := conn.Write([]byte(storedMessages[i] + "\n"))
+
+	filePath := "file/messages.txt"
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		fmt.Println("Error reading from the file:", err)
+		return
+	}
+
+	storedMessages := strings.Split(string(content), "\n")
+
+	for _, message := range storedMessages {
+		if len(message) > 0 && message[0] == '[' {
+			slice := strings.Split(message, ":")
+
+			if len(slice) > 3 && slice[3] != "" {
+				_, err := conn.Write([]byte(message + "\n"))
 				if err != nil {
 					fmt.Printf("Error sending chat history: %v\n", err)
 					return
 				}
 			}
-
 		}
 	}
 }
