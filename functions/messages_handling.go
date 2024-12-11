@@ -44,15 +44,24 @@ func TypingPlace(name string, conn net.Conn) {
 	}
 }
 
-func StoreMessages(message string) {
-	filePath := "file/messages.txt"
-
-	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o666)
+func ClearFile(filename string) {
+	file, err := os.Create(filename)
 	if err != nil {
-		fmt.Println("Error opening the file :", err)
+		fmt.Printf("Error clearing file %s: %v\n", filename, err)
 		return
 	}
 	defer file.Close()
+}
+
+func StoreMessages(message string) {
+	filePath := "file/messages.txt"
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		fmt.Println("Error opening the file:", err)
+		return
+	}
+	defer file.Close()
+
 	message = strings.TrimSpace(message)
 	_, err = file.WriteString(message + "\n")
 	if err != nil {

@@ -15,13 +15,19 @@ func StartServer() net.Listener {
 	if len(os.Args) == 2 {
 		port = ":" + os.Args[1]
 	}
-
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
 		fmt.Println("Error listening:", err)
 		return nil
 	}
-	fmt.Printf("Server started on port %s\n", port)
+	addr := listener.Addr().String()
+	_, port, err = net.SplitHostPort(addr)
+	if err != nil {
+		fmt.Printf("error spliting the host from the port: %v\n", err)
+		return nil
+	}
+	fmt.Printf("Server started on port: %s\n", port)
+
 	return listener
 }
 

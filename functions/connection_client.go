@@ -75,13 +75,13 @@ func ClientName(conn net.Conn) string {
 		}
 
 		if name == "" || len(name) > 25 {
-			conn.Write([]byte("Please enter a valid name!\n[ENTER YOUR NAME]: "))
+			conn.Write([]byte("Please enter a valid name!\nExample of a valid name : oumayma , yassine , hamza\n[ENTER YOUR NAME]: "))
 			logCount++
 			continue
 		}
 
 		if SpaceName(name) {
-			conn.Write([]byte("The username must be without space !\n[ENTER YOUR NAME]: "))
+			conn.Write([]byte("The username must be without space !\nExample of a valid name : oumayma , yassine , hamza\n[ENTER YOUR NAME]: "))
 			logCount++
 			continue
 		}
@@ -89,11 +89,12 @@ func ClientName(conn net.Conn) string {
 		mu.Lock()
 		if _, exists := clientM[name]; exists {
 			mu.Unlock()
-			conn.Write([]byte("Name already taken. Choose another one:\n[ENTER YOUR NAME]: "))
+			conn.Write([]byte("Name already taken. Choose another one:\nExample of a valid name : oumayma , yassine , hamza\n[ENTER YOUR NAME]: "))
 			logCount++
 			continue
 		}
 		clientM[name] = conn
+		fmt.Println(clientM)
 		mu.Unlock()
 
 		fmt.Printf("Client %s connected\n", name)
