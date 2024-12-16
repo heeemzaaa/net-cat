@@ -9,7 +9,6 @@ import (
 )
 
 // this function handles the client connection
-
 func HandleClients(conn net.Conn) {
 	defer conn.Close()
 
@@ -17,6 +16,7 @@ func HandleClients(conn net.Conn) {
 	name := ClientName(conn)
 	if counter >= 10 {
 		RejectConnection(conn)
+		RemoveClient(name)
 		return
 	}
 	IncrementConnectionCount()
