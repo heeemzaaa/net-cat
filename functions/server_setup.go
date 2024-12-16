@@ -18,13 +18,13 @@ func StartServer() net.Listener {
 	}
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
-		fmt.Println("Error listening:", err)
+		fmt.Fprintln(os.Stderr, "Error listening:", err)
 		return nil
 	}
 	addr := listener.Addr().String()
 	_, port, err = net.SplitHostPort(addr)
 	if err != nil {
-		fmt.Printf("error spliting the host from the port: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error spliting the host from the port: %v\n", err)
 		return nil
 	}
 	fmt.Printf("Server started on port: %s\n", port)
@@ -37,7 +37,7 @@ func AcceptConnections(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("Error accepting connections:", err)
+			fmt.Fprintln(os.Stderr, "Error accepting connections:", err)
 			continue
 		}
 		go HandleClients(conn)
