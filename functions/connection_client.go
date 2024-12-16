@@ -14,11 +14,12 @@ func HandleClients(conn net.Conn) {
 
 	Welcoming(conn)
 	name := ClientName(conn)
-	IncrementConnectionCount()
-	if counter >= 10 {
+
+	if counter >= 2 {
 		RejectConnection(conn)
 		return
 	}
+	IncrementConnectionCount()
 	SendHistoryChat(conn)
 	message := fmt.Sprintf("\n%s has joined our chat...\n", name)
 	BroadcastMessage(message, conn)
@@ -100,7 +101,6 @@ func ClientName(conn net.Conn) string {
 		clientM[name] = conn
 		mu.Unlock()
 
-		fmt.Printf("Client %s connected\n", name)
 		return name
 	}
 }
