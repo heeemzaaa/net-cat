@@ -105,26 +105,6 @@ func ClientName(conn net.Conn) string {
 	}
 }
 
-// this function broadcast the message to other clients
-func BroadcastMessage(message string, excluded net.Conn) {
-	mu.Lock()
-	StoreMessages(message)
-	defer mu.Unlock()
-
-	for clientName, conn := range clientM {
-		if conn == excluded {
-			TypingPlace(clientName, conn)
-			continue
-		} else {
-			_, err := conn.Write([]byte(message))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error broadcasting to %s: %v\n", clientName, err)
-				continue
-			}
-			TypingPlace(clientName, conn)
-		}
-	}
-}
 
 // this function checks if the client isn't there and removes it
 func RemoveClient(name string) {
