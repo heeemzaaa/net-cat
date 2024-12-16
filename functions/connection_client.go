@@ -9,13 +9,13 @@ import (
 )
 
 // this function handles the client connection
+
 func HandleClients(conn net.Conn) {
 	defer conn.Close()
 
 	Welcoming(conn)
 	name := ClientName(conn)
-
-	if counter >= 2 {
+	if counter >= 10 {
 		RejectConnection(conn)
 		return
 	}
