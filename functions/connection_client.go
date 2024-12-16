@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 )
 
+// this function handles the client connection
 func HandleClients(conn net.Conn) {
 	defer conn.Close()
 
@@ -23,6 +25,7 @@ func HandleClients(conn net.Conn) {
 	Handlemessages(name, conn)
 }
 
+// this function welcomes the new client by the logo and the prompt
 func Welcoming(conn net.Conn) {
 	welcome := `Welcome to TCP-Chat!
          _nnnn_
@@ -45,18 +48,19 @@ _)      \.___.,|     .'
 
 	_, err := conn.Write([]byte(welcome))
 	if err != nil {
-		fmt.Println("Error sending the welcoming message:", err)
+		fmt.Fprintln(os.Stderr, "Error sending the welcoming message:", err)
 		return
 	}
 }
 
+// this function handles the client name
 func ClientName(conn net.Conn) string {
 	logCount := 0
 	for {
-		if logCount > 2 {
+		if logCount > 5 {
 			_, err := conn.Write([]byte("\nYou've reached your trying limit"))
 			if err != nil {
-				fmt.Println("Error:", err)
+				fmt.Fprintln(os.Stderr, "Error sending the message:", err)
 				return ""
 			}
 			logCount = 0
@@ -65,7 +69,7 @@ func ClientName(conn net.Conn) string {
 		reader := bufio.NewReader(conn)
 		name, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("Error reading the name from the user:", err)
+			fmt.Fprintln(os.Stderr, "Error reading the name from the user:", err)
 			return ""
 		}
 
@@ -94,7 +98,6 @@ func ClientName(conn net.Conn) string {
 			continue
 		}
 		clientM[name] = conn
-		fmt.Println(clientM)
 		mu.Unlock()
 
 		fmt.Printf("Client %s connected\n", name)
@@ -102,6 +105,7 @@ func ClientName(conn net.Conn) string {
 	}
 }
 
+// this function broadcast the message to other clients
 func BroadcastMessage(message string, excluded net.Conn) {
 	mu.Lock()
 	StoreMessages(message)
@@ -114,7 +118,7 @@ func BroadcastMessage(message string, excluded net.Conn) {
 		} else {
 			_, err := conn.Write([]byte(message))
 			if err != nil {
-				fmt.Printf("Error broadcasting to %s: %v\n", clientName, err)
+				fmt.Fprintf(os.Stderr, "Error broadcasting to %s: %v\n", clientName, err)
 				continue
 			}
 			TypingPlace(clientName, conn)
@@ -122,6 +126,7 @@ func BroadcastMessage(message string, excluded net.Conn) {
 	}
 }
 
+// this function checks if the client isn't there and removes it
 func RemoveClient(name string) {
 	mu.Lock()
 	conn, ok := clientM[name]
@@ -139,22 +144,25 @@ func RemoveClient(name string) {
 	BroadcastMessage(message, nil)
 }
 
+// this function increment the connection
 func IncrementConnectionCount() {
 	mu.Lock()
 	defer mu.Unlock()
 	counter++
 }
 
+// this function decrement the connection
 func DecrementConnectionCount() {
 	mu.Lock()
 	defer mu.Unlock()
 	counter--
 }
 
+// this function reject connection if the connection reaches its limit
 func RejectConnection(conn net.Conn) {
 	_, err := conn.Write([]byte("The room has reached its limit , try again later !\n"))
 	if err != nil {
-		fmt.Println("Error :", err)
+		fmt.Fprintln(os.Stderr, "Error sending the rejection message:", err)
 		return
 	}
 	conn.Close()

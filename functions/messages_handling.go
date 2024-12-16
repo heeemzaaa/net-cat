@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// this function handles the messages sent by the client 
 func Handlemessages(name string, conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	for {
@@ -22,11 +23,15 @@ func Handlemessages(name string, conn net.Conn) {
 
 		message = strings.TrimSpace(message)
 		if !Printable(message) {
-			message = ""
+			_, err := conn.Write([]byte("Invalid message !\n"))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error sending the invalid message: %v\n", err)
+				return
+			}
 		}
 		if message != "" && len(message) < 300 {
 			timeNow := time.Now().Format("2006-01-02 15:04:05")
-			formattedMessage := fmt.Sprintf("\n[%s][%s]: %s\n", timeNow, name, message)
+			formattedMessage := fmt.Sprintf("\n[%s][%s]:%s\n", timeNow, name, message)
 			BroadcastMessage(formattedMessage, conn)
 		} else {
 			TypingPlace(name, conn)
@@ -35,65 +40,14 @@ func Handlemessages(name string, conn net.Conn) {
 	}
 }
 
+// this function handles the prompt giving to the user  
 func TypingPlace(name string, conn net.Conn) {
 	timeNow := time.Now().Format("2006-01-02 15:04:05")
 	prompt := fmt.Sprintf("[%s][%s]:", timeNow, name)
 	_, err := conn.Write([]byte(prompt))
 	if err != nil {
-		fmt.Printf("Error sending typing prompt to %s: %v\n", name, err)
+		fmt.Fprintf(os.Stderr, "Error sending typing prompt to %s: %v\n", name, err)
 	}
 }
 
-func ClearFile(filename string) {
-	file, err := os.Create(filename)
-	if err != nil {
-		fmt.Printf("Error clearing file %s: %v\n", filename, err)
-		return
-	}
-	defer file.Close()
-}
 
-func StoreMessages(message string) {
-	filePath := "file/messages.txt"
-	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		fmt.Println("Error opening the file:", err)
-		return
-	}
-	defer file.Close()
-
-	message = strings.TrimSpace(message)
-	_, err = file.WriteString(message + "\n")
-	if err != nil {
-		fmt.Println("Error writing in the file :", err)
-		return
-	}
-}
-
-func SendHistoryChat(conn net.Conn) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	filePath := "file/messages.txt"
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		fmt.Println("Error reading from the file:", err)
-		return
-	}
-
-	storedMessages := strings.Split(string(content), "\n")
-
-	for _, message := range storedMessages {
-		if len(message) > 0 && message[0] == '[' {
-			slice := strings.Split(message, ":")
-
-			if len(slice) > 3 && slice[3] != "" {
-				_, err := conn.Write([]byte(message + "\n"))
-				if err != nil {
-					fmt.Printf("Error sending chat history: %v\n", err)
-					return
-				}
-			}
-		}
-	}
-}

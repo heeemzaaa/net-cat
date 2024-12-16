@@ -6,6 +6,7 @@ import (
 	"os"
 )
 
+// this function starts a server and gives the port to the user
 func StartServer() net.Listener {
 	port := ":8989"
 	if len(os.Args) > 2 {
@@ -31,6 +32,7 @@ func StartServer() net.Listener {
 	return listener
 }
 
+// this function accept the connections
 func AcceptConnections(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
